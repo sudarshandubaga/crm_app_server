@@ -10,13 +10,19 @@ class Firm extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'name', 'logo', 'category', 'expire_at', 'settings', 'timezone',
+        'name', 'logo', 'category', 'expire_at', 'settings', 'timezone', 'plan_id', 'has_used_first_time_offer',
     ];
 
     protected $casts = [
         'settings'  => 'array',
         'expire_at' => 'date',
+        'has_used_first_time_offer' => 'boolean',
     ];
+
+    public function plan()
+    {
+        return $this->belongsTo(Plan::class);
+    }
 
     public function users()
     {

@@ -137,4 +137,9 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Message Templates
     Route::apiResource('message-templates', MessageTemplateController::class);
+
+    // Subscriptions & Payments
+    Route::get('plans', [\App\Http\Controllers\PlanController::class, 'index']);
+    Route::post('payments/create-order', [\App\Http\Controllers\PaymentController::class, 'createOrder']);
+    Route::post('payments/verify', [\App\Http\Controllers\PaymentController::class, 'verifyPayment']);
 });
