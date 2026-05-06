@@ -13,6 +13,7 @@ use App\Http\Controllers\UserController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\FirmController;
 use App\Http\Controllers\MessageTemplateController;
+use App\Http\Controllers\NotificationController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -38,108 +39,114 @@ Route::prefix('locations')->group(function () {
 // ── Authenticated Routes ───────────────────────────────────────────────────
 Route::middleware('auth:sanctum')->group(function () {
 
-    // Reports
-    Route::get('reports/summary', [ReportController::class, 'summary']);
-
-    // Locations (Authenticated Add)
-    Route::prefix('locations')->group(function () {
-        Route::post('countries', [LocationController::class, 'addCountry']);
-        Route::post('states', [LocationController::class, 'addState']);
-        Route::post('cities', [LocationController::class, 'addCity']);
-    });
-
-    // Auth
+    // Auth (always accessible when authenticated)
     Route::prefix('auth')->group(function () {
         Route::get('profile', [AuthController::class, 'profile']);
         Route::put('profile', [AuthController::class, 'updateProfile']);
         Route::put('change-password', [AuthController::class, 'changePassword']);
         Route::post('logout', [AuthController::class, 'logout']);
-        Route::post('register', [AuthController::class, 'register']); // admin creates staff
     });
 
-    // Firm
-    Route::prefix('firm')->group(function () {
-        Route::get('/', [FirmController::class, 'show']);
-        Route::put('/', [FirmController::class, 'update']);
-    });
-
-    // Users (firm-scoped)
-    Route::prefix('users')->group(function () {
-        Route::get('/', [UserController::class, 'index']);
-        Route::get('{user}', [UserController::class, 'show']);
-        Route::put('{user}', [UserController::class, 'update']);
-        Route::delete('{user}', [UserController::class, 'destroy']);
-    });
-
-    // Contacts
-    Route::apiResource('contacts', ContactController::class);
-
-    // Pipelines + Stages (nested)
-    Route::apiResource('pipelines', PipelineController::class);
-    Route::prefix('pipelines/{pipeline}/stages')->group(function () {
-        Route::post('/', [PipelineController::class, 'storeStage']);
-        Route::put('{stage}', [PipelineController::class, 'updateStage']);
-        Route::delete('{stage}', [PipelineController::class, 'destroyStage']);
-    });
-
-    // Leads
-    Route::apiResource('leads', LeadController::class);
-
-    // Activities — firm-wide list (for Follow-ups tab)
-    Route::get('activities', [ActivityController::class, 'firmIndex']);
-
-    // Activities (nested under lead)
-    Route::prefix('leads/{lead}/activities')->group(function () {
-        Route::get('/', [ActivityController::class, 'index']);
-        Route::post('/', [ActivityController::class, 'store']);
-        Route::put('{activity}', [ActivityController::class, 'update']);
-        Route::delete('{activity}', [ActivityController::class, 'destroy']);
-    });
-
-    // Notes (nested under lead)
-    Route::prefix('leads/{lead}/notes')->group(function () {
-        Route::get('/', [NoteController::class, 'index']);
-        Route::post('/', [NoteController::class, 'store']);
-        Route::put('{note}', [NoteController::class, 'update']);
-        Route::delete('{note}', [NoteController::class, 'destroy']);
-    });
-
-    // Activity Logs
-    Route::prefix('activity-logs')->group(function () {
-        Route::get('/', [ActivityLogController::class, 'index']);                      // firm-wide (admin)
-        Route::get('leads/{lead}', [ActivityLogController::class, 'forLead']);         // per lead
-    });
-
-    // Custom Fields
-    Route::prefix('custom-fields')->group(function () {
-        // Categories
-        Route::get('categories', [CustomFieldController::class, 'categories']);
-        Route::post('categories', [CustomFieldController::class, 'storeCategory']);
-        Route::put('categories/{customFieldCategory}', [CustomFieldController::class, 'updateCategory']);
-        Route::delete('categories/{customFieldCategory}', [CustomFieldController::class, 'destroyCategory']);
-
-        // Fields (under a category)
-        Route::post('categories/{customFieldCategory}/fields', [CustomFieldController::class, 'storeField']);
-        Route::put('fields/{customField}', [CustomFieldController::class, 'updateField']);
-        Route::delete('fields/{customField}', [CustomFieldController::class, 'destroyField']);
-
-        // Save values for lead/contact
-        Route::post('values', [CustomFieldController::class, 'saveValues']);
-    });
-
-    // Notifications
-    Route::prefix('notifications')->group(function () {
-        Route::get('/', [NotificationController::class, 'index']);
-        Route::post('mark-all-read', [NotificationController::class, 'markAllRead']);
-        Route::put('{notification}/read', [NotificationController::class, 'markRead']);
-        Route::delete('{notification}', [NotificationController::class, 'destroy']);
-    });
-
-    // Message Templates
-    Route::apiResource('message-templates', MessageTemplateController::class);
-
-    // Subscriptions & Payments
+    // Subscriptions & Payments (always accessible when authenticated)
     Route::get('plans', [\App\Http\Controllers\PlanController::class, 'index']);
     Route::post('payments/create-order', [\App\Http\Controllers\PaymentController::class, 'createOrder']);
     Route::post('payments/verify', [\App\Http\Controllers\PaymentController::class, 'verifyPayment']);
+
+    // Feature Routes (Protected by subscription)
+    Route::middleware('subscribed')->group(function () {
+        // Reports
+        Route::get('reports/summary', [ReportController::class, 'summary']);
+
+        // Locations (Authenticated Add)
+        Route::prefix('locations')->group(function () {
+            Route::post('countries', [LocationController::class, 'addCountry']);
+            Route::post('states', [LocationController::class, 'addState']);
+            Route::post('cities', [LocationController::class, 'addCity']);
+        });
+
+        // Auth Register
+        Route::post('auth/register', [AuthController::class, 'register']); // admin creates staff
+
+        // Firm
+        Route::prefix('firm')->group(function () {
+            Route::get('/', [FirmController::class, 'show']);
+            Route::put('/', [FirmController::class, 'update']);
+        });
+
+        // Users (firm-scoped)
+        Route::prefix('users')->group(function () {
+            // Re-import because of middleware scope
+            Route::get('/', [UserController::class, 'index']);
+            Route::get('{user}', [UserController::class, 'show']);
+            Route::put('{user}', [UserController::class, 'update']);
+            Route::delete('{user}', [UserController::class, 'destroy']);
+        });
+
+        // Contacts
+        Route::apiResource('contacts', ContactController::class);
+
+        // Pipelines + Stages (nested)
+        Route::apiResource('pipelines', PipelineController::class);
+        Route::prefix('pipelines/{pipeline}/stages')->group(function () {
+            Route::post('/', [PipelineController::class, 'storeStage']);
+            Route::put('{stage}', [PipelineController::class, 'updateStage']);
+            Route::delete('{stage}', [PipelineController::class, 'destroyStage']);
+        });
+
+        // Leads
+        Route::apiResource('leads', LeadController::class);
+
+        // Activities — firm-wide list (for Follow-ups tab)
+        Route::get('activities', [ActivityController::class, 'firmIndex']);
+
+        // Activities (nested under lead)
+        Route::prefix('leads/{lead}/activities')->group(function () {
+            Route::get('/', [ActivityController::class, 'index']);
+            Route::post('/', [ActivityController::class, 'store']);
+            Route::put('{activity}', [ActivityController::class, 'update']);
+            Route::delete('{activity}', [ActivityController::class, 'destroy']);
+        });
+
+        // Notes (nested under lead)
+        Route::prefix('leads/{lead}/notes')->group(function () {
+            Route::get('/', [NoteController::class, 'index']);
+            Route::post('/', [NoteController::class, 'store']);
+            Route::put('{note}', [NoteController::class, 'update']);
+            Route::delete('{note}', [NoteController::class, 'destroy']);
+        });
+
+        // Activity Logs
+        Route::prefix('activity-logs')->group(function () {
+            Route::get('/', [ActivityLogController::class, 'index']);                      // firm-wide (admin)
+            Route::get('leads/{lead}', [ActivityLogController::class, 'forLead']);         // per lead
+        });
+
+        // Custom Fields
+        Route::prefix('custom-fields')->group(function () {
+            // Categories
+            Route::get('categories', [CustomFieldController::class, 'categories']);
+            Route::post('categories', [CustomFieldController::class, 'storeCategory']);
+            Route::put('categories/{customFieldCategory}', [CustomFieldController::class, 'updateCategory']);
+            Route::delete('categories/{customFieldCategory}', [CustomFieldController::class, 'destroyCategory']);
+
+            // Fields (under a category)
+            Route::post('categories/{customFieldCategory}/fields', [CustomFieldController::class, 'storeField']);
+            Route::put('fields/{customField}', [CustomFieldController::class, 'updateField']);
+            Route::delete('fields/{customField}', [CustomFieldController::class, 'destroyField']);
+
+            // Save values for lead/contact
+            Route::post('values', [CustomFieldController::class, 'saveValues']);
+        });
+
+        // Notifications
+        Route::prefix('notifications')->group(function () {
+            Route::get('/', [NotificationController::class, 'index']);
+            Route::post('mark-all-read', [NotificationController::class, 'markAllRead']);
+            Route::put('{notification}/read', [NotificationController::class, 'markRead']);
+            Route::delete('{notification}', [NotificationController::class, 'destroy']);
+        });
+
+        // Message Templates
+        Route::apiResource('message-templates', MessageTemplateController::class);
+    });
 });
