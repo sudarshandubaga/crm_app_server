@@ -15,7 +15,7 @@ class ActivityController extends Controller
     public function firmIndex(Request $request)
     {
         $firmId = $request->user()->firm_id;
-        $status = $request->query('status'); // pending, missed, done
+        $status = $request->query('status'); // pending, upcoming, missed, done
         $date = $request->query('date');     // YYYY-MM-DD
 
         $query = Activity::whereHas('lead', function ($q) use ($firmId) {
@@ -26,16 +26,26 @@ class ActivityController extends Controller
                 'user',
             ]);
 
-        if ($date) {
-            $query->whereDate('due_at', $date);
-        }
-
         if ($status === 'pending') {
+            if ($date) {
+                $query->whereDate('due_at', $date);
+            }
             $query->where('status', 'pending')->where('due_at', '>=', now());
+        } elseif ($status === 'upcoming') {
+            $query->where('status', 'pending')->where('due_at', '>', now());
+            if ($date) {
+                $query->whereDate('due_at', $date);
+            }
         } elseif ($status === 'missed') {
             $query->where('status', 'pending')->where('due_at', '<', now());
+            if ($date) {
+                $query->whereDate('due_at', $date);
+            }
         } elseif ($status === 'done') {
             $query->where('status', 'completed');
+            if ($date) {
+                $query->whereDate('due_at', $date);
+            }
         }
 
         $activities = $query->orderBy('due_at', 'asc')->get();
