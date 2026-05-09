@@ -15,7 +15,7 @@ class Firm extends Model
 
     protected $casts = [
         'settings'  => 'array',
-        'expire_at' => 'date',
+        'expire_at' => 'datetime', // Use datetime (not date) so API returns full ISO 8601 string
         'has_used_first_time_offer' => 'boolean',
     ];
 
