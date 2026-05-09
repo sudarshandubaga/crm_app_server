@@ -17,6 +17,8 @@ class ActivityController extends Controller
         $firmId = $request->user()->firm_id;
         $status = $request->query('status'); // pending, upcoming, missed, done
         $date = $request->query('date');     // YYYY-MM-DD
+        $startDate = $request->query('start_date');
+        $endDate = $request->query('end_date');
 
         $query = Activity::whereHas('lead', function ($q) use ($firmId) {
                 $q->where('firm_id', $firmId);
@@ -26,26 +28,30 @@ class ActivityController extends Controller
                 'user',
             ]);
 
+        // Date Range Filter (takes precedence over single date if provided)
+        if ($startDate && $endDate) {
+            $query->whereBetween('due_at', [$startDate . ' 00:00:00', $endDate . ' 23:59:59']);
+        } elseif ($date && $status !== 'upcoming' && $status !== 'missed') {
+            $query->whereDate('due_at', $date);
+        }
+
         if ($status === 'pending') {
-            if ($date) {
-                $query->whereDate('due_at', $date);
+            $query->where('status', 'pending');
+            if (!$startDate && !$endDate) {
+                $query->where('due_at', '>=', now());
             }
-            $query->where('status', 'pending')->where('due_at', '>=', now());
         } elseif ($status === 'upcoming') {
-            $query->where('status', 'pending')->where('due_at', '>', now());
-            if ($date) {
-                $query->whereDate('due_at', $date);
+            $query->where('status', 'pending');
+            if (!$startDate && !$endDate) {
+                $query->where('due_at', '>', now());
             }
         } elseif ($status === 'missed') {
-            $query->where('status', 'pending')->where('due_at', '<', now());
-            if ($date) {
-                $query->whereDate('due_at', $date);
+            $query->where('status', 'pending');
+            if (!$startDate && !$endDate) {
+                $query->where('due_at', '<', now());
             }
         } elseif ($status === 'done') {
             $query->where('status', 'completed');
-            if ($date) {
-                $query->whereDate('due_at', $date);
-            }
         }
 
         $activities = $query->orderBy('due_at', 'asc')->get();
@@ -67,7 +73,7 @@ class ActivityController extends Controller
         $this->authorizeLead($request, $lead);
 
         $data = $request->validate([
-            'type'   => 'required|in:call,email,meeting,note,task',
+            'type'   => 'required|in:call,email,meeting,note,task,presentation,other',
             'notes'  => 'nullable|string',
             'due_at' => 'nullable|date',
             'status' => 'nullable|string|in:pending,completed',
@@ -87,7 +93,7 @@ class ActivityController extends Controller
         $this->authorizeLead($request, $lead);
 
         $data = $request->validate([
-            'type'   => 'sometimes|in:call,email,meeting,note,task',
+            'type'   => 'sometimes|in:call,email,meeting,note,task,presentation,other',
             'notes'  => 'nullable|string',
             'due_at' => 'nullable|date',
             'status' => 'nullable|string|in:pending,completed',

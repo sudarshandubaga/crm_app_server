@@ -109,7 +109,7 @@ class AuthController extends Controller
 
         return response()->json([
             'token' => $token,
-            'user' => $user,
+            'user' => $user->load('firm.plan'),
         ]);
     }
 
@@ -118,7 +118,7 @@ class AuthController extends Controller
      */
     public function profile(Request $request)
     {
-        return response()->json(['user' => $request->user()->load('firm')]);
+        return response()->json(['user' => $request->user()->load('firm.plan')]);
     }
 
     /**
